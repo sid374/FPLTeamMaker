@@ -1,8 +1,12 @@
 from pymongo import MongoClient
+from pymongo import ASCENDING, DESCENDING
 import logging
 import sys
 import numpy
 from sets import Set
+import pdb
+import thread
+from functools import lru_cache
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
@@ -31,7 +35,7 @@ class Player:
 		pass
 
 	def __str__(self):
-		return 'Name: ' + self.name
+		return 'Name: ' + self.name + ' ' + self.position
 		#return 'Name: ' + self.name + ' Rating: ' + str(self.rating) + ' Cost: ' + str(self.cost)
 
 	__repr__ = __str__
@@ -86,11 +90,15 @@ def GetDefRating(player, maxValues):
 def GetGKRating(player, maxValues):
 	return GetDefRating(player, maxValues)
 
-def AssignPoints():
+	
+def GetPlayers(position, count = 6):
 	maxValues = GetMaxValues()
 
 	players = []
-	for player in playerCollection.find():
+	for player in playerCollection.find({'position':position}).sort("total_points", DESCENDING):
+		if count == 0:
+			break
+		count-=1
 		rating = 0
 		if player['position'] == 'FWD':
 			rating = GetForwardRating(player, maxValues)
@@ -98,7 +106,7 @@ def AssignPoints():
 			rating = GetMidRating(player, maxValues)
 		elif player['position'] == 'DEF':
 			rating = GetDefRating(player, maxValues)
-		elif player['position'] == 'GK':
+		elif player['position'] == 'GKP':
 			rating = GetDefRating(player, maxValues)
 		p = Player()
 		#p.rating = rating
@@ -112,6 +120,10 @@ def AssignPoints():
 
 	players.sort(key = lambda x: x.rating, reverse = True)
 	return players
+	
+def AssignPoints():
+	return GetPlayers('FWD') + GetPlayers('MID') + GetPlayers('DEF') + GetPlayers('GKP')
+
 	#print selectedPlayers
 	#ks, ksarr = KnapSackFPL(players, 1000, 20, 10)
 
@@ -153,7 +165,6 @@ def KnapSackFPL(players, budget, index, selectedCount):
 
 	includeCurrent += players[index-1].rating
 	includedArray.append( players[index-1] )
-
 	#print str(iteration)
 	if(players[index-1].cost <= budget and includeCurrent > excludeCurrent):
 		if budget not in cache:
@@ -245,23 +256,32 @@ def FPLKnapSackDP(players, budget):
 
 	return selectedList
 
-
 fplCache = {}
+	
+def CacheHit(budget, index, formations):
+	global fplCache
+	if budget in fplCache and index in fplCache[budget] and str(formations) in fplCache[budget][index]:
+		return True
+	return False
+
 def FPLKnapSack(players, budget, index, formations):
 	global fplCache
-	if budget == 0 or index == 0 or formations[players[index-1].position] == 0:
+	print "Budget = {}, index = {}, formations = {}".format(budget, index, formations)
+	if budget == 0 or index == 0:
 		return 0, []
-	if budget in fplCache and index in fplCache[budget] and str(formations) in fplCache[budget][index]:
-		#print 'Cache hit!'
+		
+	if CacheHit(budget, index, formations):
 		return fplCache[budget][index][str(formations)]
-	if players[index-1].cost > budget:
+		
+	if players[index-1].cost > budget or formations[players[index-1].position] == 0:
 		return FPLKnapSack(players, budget, index-1, formations)
+		
 	else:
 		incFormations = formations.copy()
 		incFormations[players[index-1].position] -= 1
-
 		selectedVal, selectedArr = FPLKnapSack(players, budget-players[index-1].cost, index-1, incFormations)
 		selectedVal += players[index-1].rating
+		
 		unselectedVal, unselectedArr = FPLKnapSack(players, budget, index-1, formations)
 
 		if budget not in fplCache:
@@ -269,7 +289,11 @@ def FPLKnapSack(players, budget, index, formations):
 		if index not in fplCache[budget]:
 			fplCache[budget][index] = {}
 
-		if players[index-1].cost <= budget and selectedVal > unselectedVal:
+		if selectedVal > unselectedVal:
+			if len(selectedArr) == len(players):
+				#pass
+				print "Length = {0}".format(len(selectedArr)) + "Budget = {0}, index = {1}, formations = {2}".format(budget, index, formations)
+				pdb.set_trace()
 			selectedArr.append(players[index-1])
 			fplCache[budget][index][str(formations)] = selectedVal, selectedArr
 			return selectedVal, selectedArr
@@ -280,6 +304,7 @@ def FPLKnapSack(players, budget, index, formations):
 
 def Driver():
 	players = AssignPoints()
+
 	selectedPlayers = FPLKnapSackDP(players, 1000)
 	print selectedPlayers
 
@@ -297,21 +322,80 @@ def Driver():
 
 def Driver2():
 	players = AssignPoints()
-	formations = {'GKP':2, 'DEF':5, 'MID':5, 'FWD':3}
-	val, selectedPs = FPLKnapSack(players[:50], 1000, 50, formations)
+	print players
+
+	formations = {'GKP':1, 'DEF':0, 'MID':5, 'FWD':1}
+	val, selectedPs = FPLKnapSack(players[:], 1000, 30, formations)
 	#selectedPs.sort(key = lambda x: x.name)
 	s = Set([(p.id, p.rating, p.name, p.position) for p in selectedPs])
 	calculatedPoints = 0
 	for p in sorted(s, key = lambda x: x[3]):
 		print p
 		calculatedPoints += p[1]
-	print calculatedPoints
-	print val
+	print "Calculated points based on list = {0}".format(calculatedPoints)
+	print "Returned points = {0}".format(val)
+	print "Number of players = {0}".format(len(s))
 
+
+def IsEmptyFormation(formations):
+	for k,v in formations.iteritems():
+		if v != 0:
+			return False
+			
+	return True
+
+def GetTeamRating(team):
+	rating = 0
+	for p in team:
+		rating += p.rating
+	return rating
+
+bestTeamLock = thread.allocate_lock()
+bestTeam = 0, []
+
+
+@lru_cache(maxsize = None)
+def KS(players, index, budget, selectedCount, selectedPlayers, formations):
+	#print index, selectedCount
+	global bestTeam
+	
+	if index == len(players) or budget == 0:
+		return 0
+		
+	if IsEmptyFormation(formations) and selectedCount == 0:
+		if GetTeamRating(selectedPlayers) > bestTeam[0]:
+			#with a_lock:
+			bestTeam = GetTeamRating(selectedPlayers), selectedPlayers
+			print selectedPlayers
+		return 0
+		
+	if players[index].cost > budget:
+		KS(players, index+1, budget, selectedCount, selectedPlayers, formations)
+	
+	#thread.start_new_thread( KS, (players, index+1, budget, selectedCount, selectedPlayers, formations))
+	excludeCurrent = KS(players, index+1, budget, selectedCount, selectedPlayers, formations)
+	selectedPlayers.append(players[index])
+	formations[players[index].position] -= 1
+	#thread.start_new_thread( KS, (players, index+1, budget-players[index].cost, selectedCount - 1, selectedPlayers, formations))
+	includeCurrent = KS(players, index+1, budget-players[index].cost, selectedCount - 1, selectedPlayers, formations)
+	formations[players[index].position] += 1
+	selectedPlayers.pop()
+	
+	return max(excludeCurrent, includeCurrent)
+		
+
+def Driver3():
+	global bestTeam
+	players = AssignPoints()
+	selectedPlayers = []
+	formations = {'GKP':2, 'DEF':5, 'MID':4, 'FWD':3}
+	print KS(players, 0, 1000, 8, selectedPlayers, formations) 
+	print bestTeam
+	print KS.cache_info()
 
 
 def main():
-	Driver2()
+	Driver3()
 	# costs = [1,2,3,4,5,6,7,8]
 	# values = [5,3,4,41,5,67,8,2]
 	# KnapSackDP(costs, values, 12)
