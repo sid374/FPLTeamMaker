@@ -1,146 +1,3 @@
-from pymongo import MongoClient
-from pymongo import ASCENDING, DESCENDING
-import logging
-import sys
-import numpy
-from sets import Set
-import pdb
-import thread
-from functools import lru_cache
-
-reload(sys)
-sys.setdefaultencoding('utf-8')
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-logger.addHandler(ch)
-
-client = MongoClient('localhost', 27017)
-db = client.fpl
-playerCollection = db['playerInfo']
-
-#
-#
-# Points and raking helper functions
-#
-#
-
-class Player:
-	def __init__(self):
-		pass
-
-	def __str__(self):
-		return 'Name: ' + self.name + ' ' + self.position
-		#return 'Name: ' + self.name + ' Rating: ' + str(self.rating) + ' Cost: ' + str(self.cost)
-
-	__repr__ = __str__
-
-def GetMaxValue(playerCollection, fieldToSortBy):
-	for i in playerCollection.find().sort(fieldToSortBy, -1):
-		return i[fieldToSortBy]
-
-def GetMaxValues():
-	maxValues = dict()
-	maxValues['goals_scored'] = GetMaxValue(playerCollection, 'goals_scored')
-	maxValues['minutes'] = GetMaxValue(playerCollection, 'minutes')
-	maxValues['assists'] = GetMaxValue(playerCollection, 'assists')
-	maxValues['bonus'] = GetMaxValue(playerCollection, 'bonus')
-	maxValues['clean_sheets'] = GetMaxValue(playerCollection, 'clean_sheets')
-
-	return maxValues
-
-def GetNormalizedRating(player, attribute, maxValues):
-	if attribute not in player:
-		return
-	rating = player[attribute] * 100/ maxValues[attribute]
-	#print  attribute + ' ' + str(rating)
-	return rating
-
-def GetForwardRating(player, maxValues):
-	rating = 0
-	rating = rating + GetNormalizedRating(player,'goals_scored', maxValues) * 4
-	rating = rating + GetNormalizedRating(player,'minutes', maxValues) * 2
-	rating = rating + GetNormalizedRating(player,'assists', maxValues) * 3
-	rating = rating + GetNormalizedRating(player,'bonus', maxValues)  * 3
-	return rating
-
-def GetMidRating(player, maxValues):
-	rating = 0
-	rating = rating + GetNormalizedRating(player,'goals_scored', maxValues) * 5
-	rating = rating + GetNormalizedRating(player,'minutes', maxValues) * 2
-	rating = rating + GetNormalizedRating(player,'assists', maxValues) * 3
-	rating = rating + GetNormalizedRating(player,'bonus', maxValues)  * 3
-	rating = rating + GetNormalizedRating(player,'clean_sheets', maxValues)  * 1
-	return rating
-
-def GetDefRating(player, maxValues):
-	rating = 0
-	rating = rating + GetNormalizedRating(player,'goals_scored', maxValues) * 6
-	rating = rating + GetNormalizedRating(player,'minutes', maxValues) * 2
-	rating = rating + GetNormalizedRating(player,'assists', maxValues) * 3
-	rating = rating + GetNormalizedRating(player,'bonus', maxValues)  * 3
-	rating = rating + GetNormalizedRating(player,'clean_sheets', maxValues)  * 4
-	return rating
-
-def GetGKRating(player, maxValues):
-	return GetDefRating(player, maxValues)
-
-	
-def GetPlayers(position, count = 6):
-	maxValues = GetMaxValues()
-
-	players = []
-	for player in playerCollection.find({'position':position}).sort("total_points", DESCENDING):
-		if count == 0:
-			break
-		count-=1
-		rating = 0
-		if player['position'] == 'FWD':
-			rating = GetForwardRating(player, maxValues)
-		elif player['position'] == 'MID':
-			rating = GetMidRating(player, maxValues)
-		elif player['position'] == 'DEF':
-			rating = GetDefRating(player, maxValues)
-		elif player['position'] == 'GKP':
-			rating = GetDefRating(player, maxValues)
-		p = Player()
-		#p.rating = rating
-		p.rating = player['total_points']
-		p.cost = player['now_cost']
-		p.name = player['first_name'] + player['second_name']
-		p.team = player['teamName']
-		p.id = player['id']
-		p.position = player['position']
-		players.append(p)
-
-	players.sort(key = lambda x: x.rating, reverse = True)
-	return players
-	
-def AssignPoints():
-	return GetPlayers('FWD') + GetPlayers('MID') + GetPlayers('DEF') + GetPlayers('GKP')
-
-	#print selectedPlayers
-	#ks, ksarr = KnapSackFPL(players, 1000, 20, 10)
-
-	# ks, ksarr = KnapSackFPL(players = players[:20], budget = 1000, index = 20, selectedCount = 4)
-
-	# tost = 0
-	# rgs = 0
-	# for p in ksarr:
-	# 	print 'Name: ' + p.name + ' Rating: ' + str(p.rating) + ' Cost: ' + str(p.cost)
-	# 	tost += p.cost
-	# 	rgs += p.rating
-	# print 'Total cost = ' + str(tost)
-	# print 'Total rgs = ' + str(rgs)
-	# print 'KS result = ' + str(ks)
-
-	#print sorted(ratings, key=lambda x: x[0])
-
 cache = {}
 iteration = 0
 def KnapSackFPL(players, budget, index, selectedCount):
@@ -204,21 +61,30 @@ def KnapSack(costs, values, budget, index):
 		return excludeCurrent, excludedArray
 
 def KnapSackDP(costs, values, budget):
-	dp = numpy.zeros((budget+1, len(costs)+1))
-
+	#dp = numpy.zeros((budget+1, len(costs)+1))
+	dp = [[{'val': 0, 'count':0} for x in range(len(costs)+1)] for y in range(budget+1)]
 	for cost in range(budget+1):
 		for i in range(len(costs)+1):
 			if cost == 0 or i == 0:
 				continue
 			elif costs[i-1] <= cost:
-				dp[cost][i] = max(values[i-1] + dp[cost-costs[i-1]][i-1], dp[cost][i-1])
+				pdb.set_trace()
+				selectCurrent = values[i-1] + dp[cost-costs[i-1]][i-1]['val']
+				excludeCurrent = dp[cost][i-1]['val']
+				if selectCurrent > excludeCurrent:
+					dp[cost][i]['val'] = selectCurrent
+					dp[cost][i]['count'] = dp[cost-costs[i-1]][i-1]['count'] + 1
+				else:
+					dp[cost][i]['val'] = excludeCurrent
+					dp[cost][i]['count'] = dp[cost][i-1]['count']
 			else:
-				dp[cost][i] = dp[cost][i-1]
+				dp[cost][i]['val'] = dp[cost][i-1]
+				dp[cost][i]['count'] = dp[cost][i-1]['count']
 
 	selectedList = []
 	row, col = budget, len(costs)
 	while row >= 0 and col >= 0:
-		if row-costs[col-1] >= 0 and dp[row][col] - values[col-1] == dp[row-costs[col-1]][col-1]:
+		if row-costs[col-1] >= 0 and dp[row][col]['val'] - values[col-1] == dp[row-costs[col-1]][col-1]['val']:
 			selectedList.append(values[col-1])
 			row = row - costs[col-1]
 			col = col-1
@@ -226,11 +92,12 @@ def KnapSackDP(costs, values, budget):
 			col = col-1
 
 
-	print dp
-	print dp[budget][len(values)]
+	for row in dp:
+		print row
+	print dp[budget][len(values)]['val']
 	print 'List' + str(selectedList)
 
-	return dp[budget][len(values)]
+	return dp[budget][len(values)]['val']
 
 def FPLKnapSackDP(players, budget):
 	dp = numpy.zeros((budget+1, len(players)+1))
@@ -351,54 +218,98 @@ def GetTeamRating(team):
 	return rating
 
 bestTeamLock = thread.allocate_lock()
-bestTeam = 0, []
+bestTeam = [0, []]
+count = 0
 
-
-@lru_cache(maxsize = None)
-def KS(players, index, budget, selectedCount, selectedPlayers, formations):
+#@lru_cache(2 = None)
+def KS(players, index, budget, selectedPlayers, formations):
 	#print index, selectedCount
+	global count
 	global bestTeam
+
+	#print count
+	count += 1
 	
-	if index == len(players) or budget == 0:
-		return 0
-		
-	if IsEmptyFormation(formations) and selectedCount == 0:
-		if GetTeamRating(selectedPlayers) > bestTeam[0]:
+	if IsEmptyFormation(formations):
+		teamRating = GetTeamRating(selectedPlayers)
+		if teamRating > bestTeam[0]:
 			#with a_lock:
-			bestTeam = GetTeamRating(selectedPlayers), selectedPlayers
-			print selectedPlayers
+			bestTeam[0] = teamRating
+			bestTeam[1] = selectedPlayers
+			print bestTeam[1]
+			print teamRating
+		return teamRating
+
+	if index == len(players) or budget <= 0:
 		return 0
 		
 	if players[index].cost > budget:
-		KS(players, index+1, budget, selectedCount, selectedPlayers, formations)
+		return KS(players, index+1, budget, selectedPlayers, formations)
 	
 	#thread.start_new_thread( KS, (players, index+1, budget, selectedCount, selectedPlayers, formations))
-	excludeCurrent = KS(players, index+1, budget, selectedCount, selectedPlayers, formations)
+	excludeCurrent = KS(players, index+1, budget, selectedPlayers, formations)
 	selectedPlayers.append(players[index])
 	formations[players[index].position] -= 1
 	#thread.start_new_thread( KS, (players, index+1, budget-players[index].cost, selectedCount - 1, selectedPlayers, formations))
-	includeCurrent = KS(players, index+1, budget-players[index].cost, selectedCount - 1, selectedPlayers, formations)
+	includeCurrent = KS(players, index+1, budget-players[index].cost, selectedPlayers, formations) + players[index].rating
 	formations[players[index].position] += 1
 	selectedPlayers.pop()
-	
+	#print "Exclude {0} Include {1} index = {2} BestTeam = {3}".format(excludeCurrent, includeCurrent, index, bestTeam) 
 	return max(excludeCurrent, includeCurrent)
 		
+best = 0,[]
+def KS2(players, index, budget, selectedPlayers, selectedCount):
+	global best
+	if selectedCount == 0:
+		global best
+		print best
+		if GetTeamRating(selectedPlayers) > best[0]:
+			best = GetTeamRating(selectedPlayers), selectedPlayers
+			print best[0]
+		return 0
+	if budget == 0 or index == 0:
+		#print selectedPlayers
+		return 0
+
+	if players[index].cost > budget:
+		return KS2(players, index-1, budget, selectedPlayers, selectedCount)
+
+	excludeCurrent = KS2(players, index-1, budget, selectedPlayers, selectedCount)
+
+	selectedPlayers.append(players[index])
+	includeCurrent = players[index].rating + KS2(players, index-1, budget - players[index].cost, selectedPlayers, selectedCount - 1)
+	selectedPlayers.pop()
+
+	return max(includeCurrent, excludeCurrent)
 
 def Driver3():
 	global bestTeam
-	players = AssignPoints()
+	players = AssignPoints(count = 10)
+	for p in players:
+		print "{0} {1} {2}".format(p, p.rating, p.cost)
+	print GetTeamRating(players)
 	selectedPlayers = []
-	formations = {'GKP':2, 'DEF':5, 'MID':4, 'FWD':3}
-	print KS(players, 0, 1000, 8, selectedPlayers, formations) 
+	formations = {'GKP':2, 'DEF':5, 'MID':3, 'FWD':3}
+	print KS(players, 0, 1000, selectedPlayers, formations)
 	print bestTeam
-	print KS.cache_info()
+	print selectedPlayers
+	#print KS.cache_info()
 
-
+def Driver4():
+	global best
+	players = AssignPoints(count = 2)
+	for p in players:
+		print "{0} {1} {2}".format(p, p.rating, p.cost)
+	print GetTeamRating(players)
+	selectedPlayers = []
+	print KS2(players, len(players)-1, 1000, selectedPlayers, 3)
+	print best
 def main():
+	#Driver4()
 	Driver3()
-	# costs = [1,2,3,4,5,6,7,8]
-	# values = [5,3,4,41,5,67,8,2]
-	# KnapSackDP(costs, values, 12)
+	# costs = [1,2,3,1,2,3]
+	# values = [5,3,8,1,2,3]
+	# KnapSackDP(costs, values, 6)
 	# value, valueArray =  KnapSack(costs, values, 9, len(costs))
 	# print value 
 	# print valueArray
