@@ -35,7 +35,7 @@ class Player:
 		pass
 
 	def __str__(self):
-		return 'Name: ' + self.name + ' ' + self.position + ' Rating:' + str(self.rating) + '  Cost' + str(self.cost) + ';'
+		return 'Name: ' + self.name + ' ' + self.position + ' Rating:' + str(self.rating) + '  Cost' + str(self.cost) + '; '
 		#return 'Name: ' + self.name + ' Rating: ' + str(self.rating) + ' Cost: ' + str(self.cost)
 
 	__repr__ = __str__
@@ -123,6 +123,27 @@ def GetPlayers(position, count = 6):
 	
 def AssignPoints(count = 6):
 	return GetPlayers('FWD', count) + GetPlayers('MID', count) + GetPlayers('DEF', count) + GetPlayers('GKP', count)
+
+def PrintPlayerList(players):
+	totalRating = 0
+	totalCost = 0
+	for p in players:
+		print p
+		totalCost += p.cost
+		totalRating += p.rating
+	print "Total rating = {0}, Total cost = {1}".format(totalRating, totalCost)
+
+def AggregatePlayerList(players, fieldName):
+	totalAggregate = 0
+	for p in players:
+		totalAggregate += getattr(p, fieldName)
+	return totalAggregate
+	
+def GetPlayerListRating(players):
+	return AggregatePlayerList(players, 'rating')
+
+def GetPlayerListCost(players):
+	return AggregatePlayerList(players, 'cost')
 
 	#print selectedPlayers
 	#ks, ksarr = KnapSackFPL(players, 1000, 20, 10)
