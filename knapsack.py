@@ -1,4 +1,5 @@
 from GetPlayers import AssignPoints, PrintPlayerList, GetPlayerListRating, GetPlayerListCost, GetPlayers
+import sys
 
 #Globals TODO: Move them to a class so we dont need globals, this might get messy quickly
 finalRating = 0
@@ -9,11 +10,13 @@ class Team:
 		pass
 
 def main():
-	players = AssignPoints(count=5)
-	#PrintPlayerList(players)
+	players = AssignPoints(count=10)
+	PrintPlayerList(players)
 	#print knapsack_saveTeam_recursive(len(players)-1, 1000, players, [])
-	#print basicKnapsack_recursive(len(players)-1, 1000, players)
-	print ks_recursive_limit(len(players)-1, 1000, 3, players)
+	cache = {}
+	print basicKnapsack_recursive_Cached(len(players)-1, 1000, players, cache)
+	print basicKnapsack_recursive(len(players)-1, 1000, players)
+	#print ks_recursive_limit(len(players)-1, 1000, 3, players)
 	#print basicDP(players, 1000)
 	#PrintPlayerList(finalSelected)
 
@@ -34,6 +37,31 @@ def basicKnapsack_recursive(index, budget, players):
 				players[index].rating + basicKnapsack_recursive(index-1, budget-players[index].cost, players),
 				basicKnapsack_recursive(index-1, budget, players )
 			)
+
+
+def basicKnapsack_recursive_Cached(index, budget, players, cache):
+	'''
+		Basic knapsack recursive algorithm
+		index: integer last index of list
+		budget: integer current budget
+		players: list of players. object needs to have cost and rating properties
+	'''
+	if index < 0 or budget == 0:
+		return 0
+	try:
+		if cache[index][budget]:
+			return cache[index][budget]
+	except KeyError as e:
+		if index not in cache:
+			cache[index] = {}
+	if players[index].cost > budget:
+		return basicKnapsack_recursive_Cached(index-1, budget, players, cache)
+	retVal =  max( 
+				players[index].rating + basicKnapsack_recursive_Cached(index-1, budget-players[index].cost, players, cache),
+				basicKnapsack_recursive_Cached(index-1, budget, players, cache)
+			)
+	cache[index][budget] = retVal;
+	return retVal
 
 
 def knapsack_saveTeam_recursive(index, budget, players, selectedPlayers):
