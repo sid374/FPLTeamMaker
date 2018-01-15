@@ -122,6 +122,9 @@ def GetPlayers(position, count = 6):
 	return players
 	
 def AssignPoints(count = 6):
+	'''
+	returns a list with count number of fwds, mids, defs and gks
+	'''
 	return GetPlayers('FWD', count) + GetPlayers('MID', count) + GetPlayers('DEF', count) + GetPlayers('GKP', count)
 
 def PrintPlayerList(players):

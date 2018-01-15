@@ -1,5 +1,6 @@
 from GetPlayers import AssignPoints, PrintPlayerList, GetPlayerListRating, GetPlayerListCost, GetPlayers
 import sys
+import pickle
 
 #Globals TODO: Move them to a class so we dont need globals, this might get messy quickly
 finalRating = 0
@@ -10,12 +11,14 @@ class Team:
 		pass
 
 def main():
-	players = AssignPoints(count=10)
-	PrintPlayerList(players)
+	serializeList()
+	deserializeList()
+	#players = AssignPoints(count=10)
+	#PrintPlayerList(players)
 	#print knapsack_saveTeam_recursive(len(players)-1, 1000, players, [])
 	cache = {}
-	print basicKnapsack_recursive_Cached(len(players)-1, 1000, players, cache)
-	print basicKnapsack_recursive(len(players)-1, 1000, players)
+	#print basicKnapsack_recursive_Cached(len(players)-1, 1000, players, cache)
+	#print basicKnapsack_recursive(len(players)-1, 1000, players)
 	#print ks_recursive_limit(len(players)-1, 1000, 3, players)
 	#print basicDP(players, 1000)
 	#PrintPlayerList(finalSelected)
@@ -139,6 +142,18 @@ def ks_recursive_limit(index, budget, playerCount, players):
 				players[index].rating + ks_recursive_limit(index-1, budget-players[index].cost, playerCount-1, players) 
 			)
 
+def serializeList():
+	players = AssignPoints(count=10)
+	out = open('playerList.pkl', 'wb')
+	pickle.dump(players, out)
+	out.close()
+	#print players
+
+def deserializeList():
+	pkl_file = open('playerList.pkl', 'rb')
+	players = pickle.load(pkl_file)
+	print players
+	pkl_file.close()
 
 if __name__ == "__main__":
     main()
