@@ -121,7 +121,7 @@ def GetPlayers(position, count = 6):
 	players.sort(key = lambda x: x.rating, reverse = True)
 	return players
 	
-def AssignPoints(count = 6):
+def GetPlayerList(count = 6):
 	'''
 	returns a list with count number of fwds, mids, defs and gks
 	'''

@@ -1,4 +1,4 @@
-from GetPlayers import AssignPoints, PrintPlayerList, GetPlayerListRating, GetPlayerListCost, GetPlayers
+from GetPlayers import GetPlayerList, PrintPlayerList, GetPlayerListRating, GetPlayerListCost, GetPlayers
 import sys
 import pickle
 
@@ -11,12 +11,12 @@ class Team:
 		pass
 
 def main():
-	serializeList()
+	#serializeList()
 	deserializeList()
-	#players = AssignPoints(count=10)
+	#players = GetPlayerList(count=10)
 	#PrintPlayerList(players)
 	#print knapsack_saveTeam_recursive(len(players)-1, 1000, players, [])
-	cache = {}
+	#cache = {}
 	#print basicKnapsack_recursive_Cached(len(players)-1, 1000, players, cache)
 	#print basicKnapsack_recursive(len(players)-1, 1000, players)
 	#print ks_recursive_limit(len(players)-1, 1000, 3, players)
@@ -129,6 +129,12 @@ def basicDP(players, budget):
 	finalRating  = GetPlayerListRating(finalSelected)
 	return cache[len(players)][budget]
 
+def ks3d():
+	'''
+	This functions solved the 3d knapsack problem. In addition to the regular knapsack problem it adds an additional constraint 'maxItems'. 
+	This is the number of items that the knapsack can contain.
+	'''
+	return
 
 def ks_recursive_limit(index, budget, playerCount, players):
 	'''
@@ -143,7 +149,7 @@ def ks_recursive_limit(index, budget, playerCount, players):
 			)
 
 def serializeList():
-	players = AssignPoints(count=10)
+	players = GetPlayerList(count=500)
 	out = open('playerList.pkl', 'wb')
 	pickle.dump(players, out)
 	out.close()
@@ -152,7 +158,8 @@ def serializeList():
 def deserializeList():
 	pkl_file = open('playerList.pkl', 'rb')
 	players = pickle.load(pkl_file)
-	#print players
+	print players
+	print len(players)
 	pkl_file.close()
 	return players
 
