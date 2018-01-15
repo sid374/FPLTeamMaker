@@ -152,8 +152,9 @@ def serializeList():
 def deserializeList():
 	pkl_file = open('playerList.pkl', 'rb')
 	players = pickle.load(pkl_file)
-	print players
+	#print players
 	pkl_file.close()
+	return players
 
 if __name__ == "__main__":
     main()
