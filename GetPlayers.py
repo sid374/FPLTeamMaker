@@ -6,7 +6,7 @@ import numpy
 from sets import Set
 import pdb
 import thread
-from repoze.lru import lru_cache
+#from repoze.lru import lru_cache
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
